@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADV Media — Labor Request</title>
+
+<!--
+  ============================================================================
+  AISD LABOR REQUEST PORTAL
+  ============================================================================
+  This is the CLIENT-FACING page. AISD staff use it to request crew for an
+  event. It deliberately shows NO rates, NO contractor names, and NO invoice
+  data — the client should never see what ADV pays its crew.
+
+  ACCESS: sign-in required. Two ways in —
+    1. Google account listed in ALLOWED_REQUESTERS below (preferred: the
+       account is actually verified by Google), or
+    2. The shared ACCESS_PASSCODE, for when a district blocks third-party
+       Google sign-in. This signs them in anonymously to Firebase so the
+       database rule can stay locked to "auth != null".
+
+  For the passcode path to work, turn on Anonymous sign-in:
+    Firebase Console > Authentication > Sign-in method > Anonymous > Enable
+
+  Requests land at "laborRequests" in Firebase and show up under
+  Admin > Labor Requests in ADV Media Teams.
+
+  DATABASE RULES — add to Realtime Database rules:
+
+    "laborRequests": {
+      ".read": "auth != null && (auth.token.email === 'dustin12342986@gmail.com' || auth.token.email === 'aracely.valencia10@gmail.com')",
+      ".write": "auth != null"
+    },
+
+  Signed-in requesters can submit, but only admins can read the list back —
+  so AISD can't see other people's requests.
+
+  ALSO: add the site's domain under Firebase Console > Authentication >
+  Settings > Authorized domains, and under Google Cloud Console > Credentials
+  > OAuth client > Authorized JavaScript origins. Both need:
+    https://dustin12342986-hue.github.io
+  ============================================================================
+-->
+
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDOf3aLq2gFJSr3ThRgeFLFu-VYc49ihW4",
+    authDomain: "crowley-football.firebaseapp.com",
+    databaseURL: "https://crowley-football-default-rtdb.firebaseio.com",
+    projectId: "crowley-football",
+    storageBucket: "crowley-football.firebasestorage.app",
+    messagingSenderId: "56102489603",
+    appId: "1:56102489603:web:1a81953b6dd0d2fb84c836",
+  };
+
+  const GOOGLE_CLIENT_ID = "56102489603-cam8dpnm79ktgm32adp5e3djoccd7hdr.apps.googleusercontent.com";
+
+  // ==========================================================================
+  // WHO CAN SUBMIT REQUESTS — edit this list.
+  //
+  // Only these exact Google accounts can get in. Anyone else who signs in is
+  // shown a "not authorized" screen and can't submit anything.
+  //
+  // Lowercase only. Add or remove addresses here, then re-upload this file.
+  // ==========================================================================
+  const ALLOWED_REQUESTERS = [
+    "ursulo.castillo@arlingtonisd.org",
+  ];
+
+  // ==========================================================================
+  // FALLBACK PASSCODE
+  //
+  // If AISD's IT blocks third-party Google sign-in, this is the way in.
+  // Change it here and re-upload to rotate it.
+  //
+  // Be aware: anyone who views this page's source can read this passcode.
+  // It keeps out casual visitors, not a determined one. That's an acceptable
+  // trade here because this page holds no rates, no crew names, and no
+  // invoice data — the worst case is a junk request you delete.
+  // ==========================================================================
+  const ACCESS_PASSCODE = "AISD 2026";
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+  :root {
+    --bg:#0A0D12; --panel:#12181F; --panel2:#1A222B; --border:#26313D;
+    --text:#EDEFF3; --text-muted:#8A96A3; --text-faint:#5C6774;
+    --green:#33A870; --amber:#E0A63C; --red:#D65A4E; --blue:#4A8FC0;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:680px; margin:0 auto; padding:24px 18px 80px; }
+  h1 { font-family:Georgia,serif; font-size:26px; margin:0 0 2px; letter-spacing:-0.3px; }
+  .subhead { color:var(--text-muted); font-size:13.5px; margin:2px 0 22px; line-height:1.5; }
+
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:16px; }
+  .label { font-size:12px; font-weight:800; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:7px; }
+  .field { margin-bottom:16px; }
+  input, select, textarea {
+    width:100%; padding:13px 14px; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:15px; font-family:inherit;
+  }
+  textarea { resize:vertical; }
+  .row { display:flex; gap:12px; }
+  .row > * { flex:1; }
+
+  .pos-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+  .pos-row:last-child { border-bottom:none; }
+  .pos-info { flex:1; }
+  .pos-name { font-weight:800; font-size:14.5px; }
+  .pos-desc { font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.4; }
+  .qty { display:flex; align-items:center; gap:8px; }
+  .qty-btn {
+    width:36px; height:36px; border-radius:9px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:19px; font-weight:800; cursor:pointer;
+  }
+  .qty-val { min-width:26px; text-align:center; font-weight:800; font-size:16px; }
+  .qty-val.zero { color:var(--text-faint); }
+
+  .btn { padding:15px 24px; border-radius:11px; border:none; background:var(--blue);
+    color:#fff; font-weight:800; font-size:16px; cursor:pointer; width:100%; }
+  .btn:disabled { opacity:0.55; }
+  .btn-ghost { background:var(--panel2); border:1px solid var(--border); color:var(--text); }
+
+  .error-msg { background:#2A1512; border:1px solid var(--red); color:#F2B8B1;
+    border-radius:10px; padding:12px 14px; font-size:13.5px; margin-top:12px; }
+  .ok-msg { background:#10241B; border:1px solid var(--green); color:#A8E0C4;
+    border-radius:10px; padding:12px 14px; font-size:13.5px; margin-top:12px; }
+  .footnote { color:var(--text-faint); font-size:12.5px; line-height:1.55; }
+  .summary { background:var(--panel2); border-radius:10px; padding:14px; font-size:13.5px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Labor Request</h1>
+  <p class="subhead">Request crew for an upcoming event. Submit as early as you can — the more notice, the better we can staff it.</p>
+  <div id="root"><div class="footnote">Loading…</div></div>
+</div>
+
+<script>
+// Positions AISD can request. Client-facing descriptions only — no rates.
+const POSITIONS = [
+  { id:"stagehand",  name:"Stagehand",           desc:"Carpentry, stage plots, moving scenery and gear during the show" },
+  { id:"spotlight",  name:"Spotlight Operator",  desc:"Follow spot" },
+  { id:"gav",        name:"General AV / Assist", desc:"A2, L2, V2 — audio, lighting, or video assist" },
+  { id:"coordinator",name:"Coordinator",         desc:"On-site crew coordination" },
+  { id:"lead",       name:"Lead Technician",     desc:"A1, L1, V1, Engineer, Stage Manager" },
+  { id:"graphics",   name:"Graphics Operator",   desc:"GFX, PowerPoint, or teleprompter" },
+  { id:"senior",     name:"Producer / Director", desc:"Show producer, director, or engineer-in-charge" },
+];
+
+let db = null;
+let auth = null;
+let currentUser = null;
+let gsiInitialized = false;
+let passcodeAccess = false;
+
+let form = {
+  eventName: "", venue: "", eventDate: "", callTime: "", endTime: "",
+  contactName: "", contactEmail: "", contactPhone: "",
+  notes: "", qty: {}, submitting: false, done: false, error: "",
+};
+POSITIONS.forEach((p) => { form.qty[p.id] = 0; });
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function isAllowed(user) {
+  if (!user || !user.email) return false;
+  return ALLOWED_REQUESTERS.map((e) => e.toLowerCase()).includes(user.email.toLowerCase());
+}
+
+function init() {
+  try {
+    if (typeof firebase === "undefined") {
+      document.getElementById("root").innerHTML = `<div class="error-msg">Couldn't load. Check your connection and reload.</div>`;
+      return;
+    }
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    auth = firebase.auth();
+    db = firebase.database();
+  } catch (e) {
+    document.getElementById("root").innerHTML = `<div class="error-msg">Couldn't connect (${esc(e.message)}).</div>`;
+    return;
+  }
+
+  auth.onAuthStateChanged((user) => {
+    currentUser = user;
+    if (!user) { passcodeAccess = false; renderSignIn(); return; }
+    // Anonymous users only get here by entering the correct passcode.
+    if (user.isAnonymous) {
+      if (!passcodeAccess) { auth.signOut(); return; }
+      render();
+      return;
+    }
+    if (!isAllowed(user)) { renderNotAllowed(); return; }
+    // Pre-fill contact details from the signed-in account.
+    if (!form.contactName && user.displayName) form.contactName = user.displayName;
+    if (!form.contactEmail && user.email) form.contactEmail = user.email;
+    render();
+  });
+}
+
+function handleGoogleCredential(response) {
+  try {
+    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    auth.signInWithCredential(credential).catch((e) => {
+      const el = document.getElementById("signInError");
+      if (el) el.innerHTML = `<div class="error-msg">${esc(e.message || "Couldn't sign in.")}</div>`;
+    });
+  } catch (e) {
+    const el = document.getElementById("signInError");
+    if (el) el.innerHTML = `<div class="error-msg">${esc(e.message || "Something went wrong.")}</div>`;
+  }
+}
+
+function renderSignIn() {
+  const root = document.getElementById("root");
+  root.innerHTML = `
+    <div class="card" style="text-align:center;">
+      <p class="footnote" style="margin-bottom:18px;">
+        Sign in with your Google account to submit a labor request.
+      </p>
+      <div id="gsiButton" style="display:flex; justify-content:center;"></div>
+      <div id="signInError"></div>
+    </div>
+    <div class="card">
+      <div class="label">Or use the access code</div>
+      <p class="footnote" style="margin-bottom:12px;">
+        If Google sign-in doesn't work on your district account, use the code we gave you.
+      </p>
+      <input id="passcodeInput" type="password" placeholder="Access code" />
+      <div id="passcodeError"></div>
+      <button class="btn" id="passcodeBtn" style="margin-top:12px;">Continue</button>
+    </div>
+  `;
+
+  const pcBtn = document.getElementById("passcodeBtn");
+  const pcInput = document.getElementById("passcodeInput");
+  const tryPasscode = async () => {
+    const entered = (pcInput.value || "").trim();
+    if (!entered) return;
+    if (entered !== ACCESS_PASSCODE) {
+      document.getElementById("passcodeError").innerHTML =
+        `<div class="error-msg">That code isn't right. Check it and try again.</div>`;
+      return;
+    }
+    pcBtn.disabled = true;
+    pcBtn.textContent = "Signing in…";
+    try {
+      // Anonymous sign-in gives them a real Firebase auth token, so the
+      // database rule can stay at "auth != null" instead of being open.
+      await auth.signInAnonymously();
+      passcodeAccess = true;
+      // onAuthStateChanged picks it up from here.
+    } catch (e) {
+      pcBtn.disabled = false;
+      pcBtn.textContent = "Continue";
+      document.getElementById("passcodeError").innerHTML =
+        `<div class="error-msg">Couldn't sign in (${esc(e.message || "unknown error")}). Anonymous sign-in may not be turned on for this project.</div>`;
+    }
+  };
+  pcBtn.onclick = tryPasscode;
+  pcInput.onkeydown = (e) => { if (e.key === "Enter") tryPasscode(); };
+
+  if (typeof google === "undefined" || !google.accounts || !google.accounts.id) {
+    document.getElementById("signInError").innerHTML =
+      `<div class="error-msg">Google sign-in hasn't loaded yet. Reload, or use the access code below.</div>`;
+    return;
+  }
+  if (!gsiInitialized) {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+      auto_select: false,
+    });
+    gsiInitialized = true;
+  }
+  google.accounts.id.renderButton(document.getElementById("gsiButton"),
+    { theme: "filled_white", size: "large", text: "signin_with", shape: "pill", width: 260 });
+}
+
+function renderNotAllowed() {
+  const root = document.getElementById("root");
+  root.innerHTML = `
+    <div class="card">
+      <div class="error-msg" style="margin-top:0;">This account isn't set up to submit requests.</div>
+      <p class="footnote" style="margin-top:14px;">
+        You're signed in as <strong>${esc(currentUser && currentUser.email)}</strong>.
+        If you should have access, let us know and we'll add you.
+      </p>
+      <button class="btn btn-ghost" id="signOutBtn" style="margin-top:14px;">Sign out</button>
+    </div>
+  `;
+  document.getElementById("signOutBtn").onclick = () => auth.signOut();
+}
+
+function totalRequested() {
+  return Object.values(form.qty).reduce((a, b) => a + b, 0);
+}
+
+function render() {
+  const root = document.getElementById("root");
+
+  if (form.done) {
+    root.innerHTML = `
+      <div class="card">
+        <div class="ok-msg" style="margin-top:0;">✓ Request submitted</div>
+        <p class="footnote" style="margin-top:14px;">
+          Thanks — we've got it. We'll confirm staffing and follow up at
+          <strong>${esc(form.contactEmail || form.contactPhone || "the contact you provided")}</strong>.
+        </p>
+        <button class="btn btn-ghost" id="againBtn" style="margin-top:14px;">Submit another request</button>
+      </div>
+    `;
+    document.getElementById("againBtn").onclick = () => {
+      form = { eventName:"", venue:"", eventDate:"", callTime:"", endTime:"",
+        contactName: form.contactName, contactEmail: form.contactEmail, contactPhone: form.contactPhone,
+        notes:"", qty:{}, submitting:false, done:false, error:"" };
+      POSITIONS.forEach((p) => { form.qty[p.id] = 0; });
+      render();
+    };
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="footnote" style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <span style="flex:1;">${currentUser && currentUser.isAnonymous
+        ? "Signed in with access code"
+        : "Signed in as " + esc(currentUser && currentUser.email)}</span>
+      <button id="signOutLink" style="background:none; border:none; color:var(--blue); font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;">Sign out</button>
+    </div>
+    <div class="card">
+      <div class="field">
+        <div class="label">Event name</div>
+        <input id="eventName" placeholder="e.g. Spring Choir Concert" value="${esc(form.eventName)}" />
+      </div>
+      <div class="field">
+        <div class="label">Venue / location</div>
+        <input id="venue" placeholder="e.g. AISD Performing Arts Center" value="${esc(form.venue)}" />
+      </div>
+      <div class="field">
+        <div class="label">Date</div>
+        <input id="eventDate" type="date" value="${esc(form.eventDate)}" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <div class="label">Crew call time</div>
+          <input id="callTime" type="time" value="${esc(form.callTime)}" />
+        </div>
+        <div class="field">
+          <div class="label">Estimated end</div>
+          <input id="endTime" type="time" value="${esc(form.endTime)}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:4px;">Positions needed</div>
+      <div class="footnote" style="margin-bottom:6px;">Not sure exactly what you need? Put your best guess and add a note below — we'll follow up.</div>
+      ${POSITIONS.map((p) => `
+        <div class="pos-row">
+          <div class="pos-info">
+            <div class="pos-name">${esc(p.name)}</div>
+            <div class="pos-desc">${esc(p.desc)}</div>
+          </div>
+          <div class="qty">
+            <button class="qty-btn" data-dec="${p.id}">−</button>
+            <span class="qty-val ${form.qty[p.id] === 0 ? "zero" : ""}">${form.qty[p.id]}</span>
+            <button class="qty-btn" data-inc="${p.id}">+</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <div class="label">Your name</div>
+        <input id="contactName" placeholder="Who we should follow up with" value="${esc(form.contactName)}" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <div class="label">Email</div>
+          <input id="contactEmail" type="email" placeholder="you@aisd.net" value="${esc(form.contactEmail)}" />
+        </div>
+        <div class="field">
+          <div class="label">Phone</div>
+          <input id="contactPhone" type="tel" placeholder="(xxx) xxx-xxxx" value="${esc(form.contactPhone)}" />
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <div class="label">Notes</div>
+        <textarea id="notes" rows="3" placeholder="Anything else we should know — load-in details, special gear, schedule quirks">${esc(form.notes)}</textarea>
+      </div>
+    </div>
+
+    ${totalRequested() > 0 ? `
+      <div class="card">
+        <div class="label">Summary</div>
+        <div class="summary">
+          ${POSITIONS.filter((p) => form.qty[p.id] > 0).map((p) => `${form.qty[p.id]} × ${esc(p.name)}`).join("<br />")}
+        </div>
+      </div>
+    ` : ""}
+
+    <div id="formError"></div>
+    <button class="btn" id="submitBtn" ${form.submitting ? "disabled" : ""}>
+      ${form.submitting ? "Sending…" : "Submit Request"}
+    </button>
+    <p class="footnote" style="margin-top:14px;">
+      Submitting doesn't confirm the booking. We'll review availability and get back to you.
+    </p>
+  `;
+
+  const bind = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = (e) => { form[id] = e.target.value; };
+  };
+  ["eventName","venue","eventDate","callTime","endTime","contactName","contactEmail","contactPhone","notes"].forEach(bind);
+
+  root.querySelectorAll("[data-inc]").forEach((b) => {
+    b.onclick = () => { form.qty[b.dataset.inc]++; render(); };
+  });
+  root.querySelectorAll("[data-dec]").forEach((b) => {
+    b.onclick = () => { const id = b.dataset.dec; if (form.qty[id] > 0) form.qty[id]--; render(); };
+  });
+  document.getElementById("submitBtn").onclick = submitRequest;
+  const signOutLink = document.getElementById("signOutLink");
+  if (signOutLink) signOutLink.onclick = () => auth.signOut();
+
+  if (form.error) {
+    document.getElementById("formError").innerHTML = `<div class="error-msg">${esc(form.error)}</div>`;
+  }
+}
+
+async function submitRequest() {
+  form.error = "";
+  if (!form.eventName.trim()) { form.error = "Add an event name."; render(); return; }
+  if (!form.eventDate) { form.error = "Pick a date for the event."; render(); return; }
+  if (totalRequested() === 0) { form.error = "Add at least one position."; render(); return; }
+  if (!form.contactName.trim()) { form.error = "Add your name so we know who to follow up with."; render(); return; }
+  if (!form.contactEmail.trim() && !form.contactPhone.trim()) {
+    form.error = "Add an email or phone number so we can reach you."; render(); return;
+  }
+
+  form.submitting = true;
+  render();
+
+  try {
+    const positions = POSITIONS
+      .filter((p) => form.qty[p.id] > 0)
+      .map((p) => ({ id: p.id, name: p.name, qty: form.qty[p.id] }));
+
+    await db.ref("laborRequests").push({
+      client: "AISD",
+      eventName: form.eventName.trim(),
+      venue: form.venue.trim(),
+      eventDate: form.eventDate,
+      callTime: form.callTime,
+      endTime: form.endTime,
+      positions,
+      totalPositions: totalRequested(),
+      contactName: form.contactName.trim(),
+      contactEmail: form.contactEmail.trim(),
+      contactPhone: form.contactPhone.trim(),
+      notes: form.notes.trim(),
+      // Who was actually signed in when this was submitted — separate from
+      // the contact fields, which they can edit.
+      submittedByEmail: currentUser && !currentUser.isAnonymous ? currentUser.email : null,
+      submittedByUid: currentUser ? currentUser.uid : null,
+      submittedVia: currentUser && currentUser.isAnonymous ? "access code" : "google",
+      status: "new",
+      submittedAt: new Date().toISOString(),
+    });
+    form.submitting = false;
+    form.done = true;
+    render();
+  } catch (e) {
+    form.submitting = false;
+    form.error = "Couldn't send that (" + (e.message || "unknown error") + "). Try again, or call us directly.";
+    render();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
