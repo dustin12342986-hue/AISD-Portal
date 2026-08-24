@@ -177,29 +177,6 @@ let gsiInitialized = false;
 let passcodeAccess = false;
 let passcodeEmail = null;
 
-// Firebase keeps the same anonymous account across visits, but only if we
-// don't sign them out. The passcode grant is stored here so a returning
-// visitor is recognised on reload and keeps their request history.
-const GRANT_KEY = "advPasscodeGrant";
-const GRANT_DAYS = 90;
-
-function saveGrant(email) {
-  try {
-    localStorage.setItem(GRANT_KEY, JSON.stringify({ email, at: Date.now() }));
-  } catch (e) { /* private mode — they'll just re-enter the code next time */ }
-}
-function loadGrant() {
-  try {
-    const g = JSON.parse(localStorage.getItem(GRANT_KEY) || "null");
-    if (!g || !g.email || !g.at) return null;
-    if (Date.now() - g.at > GRANT_DAYS * 864e5) return null;
-    return g;
-  } catch (e) { return null; }
-}
-function clearGrant() {
-  try { localStorage.removeItem(GRANT_KEY); } catch (e) { /* nothing to clear */ }
-}
-
 let form = {
   eventName: "", venue: "", eventDate: "", callTime: "", endTime: "",
   contactName: "", contactEmail: "", contactPhone: "",
@@ -235,18 +212,10 @@ function init() {
     currentUser = user;
     if (!user) { passcodeAccess = false; renderSignIn(); return; }
     // Anonymous users only get here by entering the correct passcode.
-    if (user.isAnonymous) {
-      if (!passcodeAccess) {
-        const grant = loadGrant();
-        if (!grant) { auth.signOut(); return; }
-        passcodeAccess = true;
-        passcodeEmail = grant.email;
-      }
-      if (!form.contactEmail && passcodeEmail) form.contactEmail = passcodeEmail;
-      render();
-      return;
-    }
-    if (!isAllowed(user)) { renderNotAllowed(); return; }
+    // Two ways in: an allowlisted Google account, or any address on the
+    // district domain that signed in with the access code.
+    const onDomain = (user.email || "").toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN);
+    if (!isAllowed(user) && !onDomain) { renderNotAllowed(); return; }
     // Pre-fill contact details from the signed-in account.
     if (!form.contactName && user.displayName) form.contactName = user.displayName;
     if (!form.contactEmail && user.email) form.contactEmail = user.email;
@@ -314,13 +283,26 @@ function renderSignIn() {
       return;
     }
     passcodeEmail = email;
-    saveGrant(email);
     pcBtn.disabled = true;
     pcBtn.textContent = "Signing in…";
     try {
-      // Anonymous sign-in gives them a real Firebase auth token, so the
-      // database rule can stay at "auth != null" instead of being open.
-      await auth.signInAnonymously();
+      // Sign them into a real account keyed to their email, using the
+      // shared passcode as the password. First person on a given address
+      // creates it; everyone after signs into the same one. That keeps the
+      // account — and their request history — identical on every device.
+      try {
+        await auth.signInWithEmailAndPassword(email, ACCESS_PASSCODE);
+      } catch (signInErr) {
+        if (signInErr.code === "auth/user-not-found") {
+          await auth.createUserWithEmailAndPassword(email, ACCESS_PASSCODE);
+        } else if (signInErr.code === "auth/wrong-password") {
+          // The address exists under a different password — most likely the
+          // access code was rotated after this account was made.
+          throw new Error("This email is already registered with a different code. Contact ADV Media and we'll reset it.");
+        } else {
+          throw signInErr;
+        }
+      }
       passcodeAccess = true;
       // onAuthStateChanged picks it up from here.
     } catch (e) {
@@ -362,7 +344,7 @@ function renderNotAllowed() {
       <button class="btn btn-ghost" id="signOutBtn" style="margin-top:14px;">Sign out</button>
     </div>
   `;
-  document.getElementById("signOutBtn").onclick = () => { clearGrant(); auth.signOut(); };
+  document.getElementById("signOutBtn").onclick = () => auth.signOut();
 }
 
 // Client-facing status labels. Deliberately plainer than the internal
@@ -446,9 +428,7 @@ function renderMyRequests() {
 function signedInBar() {
   return `
     <div class="footnote" style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-      <span style="flex:1;">${currentUser && currentUser.isAnonymous
-        ? "Signed in as " + esc(passcodeEmail || "access code")
-        : "Signed in as " + esc(currentUser && currentUser.email)}</span>
+      <span style="flex:1;">Signed in as ${esc(currentUser && currentUser.email)}</span>
       <button id="signOutLink" style="background:none; border:none; color:var(--blue); font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;">Sign out</button>
     </div>
   `;
@@ -469,7 +449,7 @@ function wireTabs() {
 
 function wireSignOut() {
   const el = document.getElementById("signOutLink");
-  if (el) el.onclick = () => { clearGrant(); auth.signOut(); };
+  if (el) el.onclick = () => auth.signOut();
 }
 
 function totalRequested() {
@@ -639,9 +619,9 @@ async function submitRequest() {
       notes: form.notes.trim(),
       // Who was actually signed in when this was submitted — separate from
       // the contact fields, which they can edit.
-      submittedByEmail: currentUser && !currentUser.isAnonymous ? currentUser.email : (passcodeEmail || null),
+      submittedByEmail: currentUser ? currentUser.email : null,
       submittedByUid: currentUser ? currentUser.uid : null,
-      submittedVia: currentUser && currentUser.isAnonymous ? "access code" : "google",
+      submittedVia: (currentUser && currentUser.providerData && currentUser.providerData.some((p) => p.providerId === "google.com")) ? "google" : "access code",
       status: "new",
       submittedAt: new Date().toISOString(),
     });
