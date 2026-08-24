@@ -400,7 +400,17 @@ function renderMyRequests() {
 
           ${inv ? `
             <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
-              <div class="label" style="margin-bottom:8px;">Invoice</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span class="label" style="margin:0;">Invoice</span>
+                ${inv.stage === "pending" ? `<span style="background:var(--amber); color:#241905; font-size:10px; font-weight:800; padding:2px 7px; border-radius:5px; text-transform:uppercase; letter-spacing:0.4px;">Pending</span>` : ""}
+              </div>
+              ${inv.stage === "pending" ? `
+                <p class="footnote" style="margin:0 0 10px;">
+                  This is the calculated amount for the event. It's awaiting your signed timesheet —
+                  once we have it, we'll confirm the hours and send the final invoice. Nothing to
+                  process yet.
+                </p>
+              ` : ""}
               ${(inv.lines || []).map((l) => `
                 <div style="display:flex; gap:10px; font-size:13px; padding:5px 0;">
                   <span style="flex:1; color:var(--text-muted);">${esc(l.rateClass)} — ${l.billedHours}h @ $${l.rate}/hr${l.detail ? ` <span style="color:var(--text-faint);">(${esc(l.detail)})</span>` : ""}</span>
@@ -408,10 +418,12 @@ function renderMyRequests() {
                 </div>
               `).join("")}
               <div style="display:flex; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
-                <span style="flex:1; font-size:15px; font-weight:800;">Total due</span>
+                <span style="flex:1; font-size:15px; font-weight:800;">${inv.stage === "pending" ? "Estimated total" : "Total due"}</span>
                 <span style="font-size:17px; font-weight:800; color:var(--green);">$${Number(inv.total).toFixed(2)}</span>
               </div>
-              <p class="footnote" style="margin:8px 0 0;">Terms: ${esc(inv.terms || "Net 30")}${inv.issuedAt ? " · issued " + new Date(inv.issuedAt).toLocaleDateString() : ""}</p>
+              <p class="footnote" style="margin:8px 0 0;">${inv.stage === "pending"
+                ? "Payment terms begin once the final invoice is issued."
+                : esc(inv.terms || "Net 30") + (inv.issuedAt ? " · issued " + new Date(inv.issuedAt).toLocaleDateString() : "")}</p>
             </div>
           ` : r.status === "scheduled" || r.status === "completed" ? `
             <p class="footnote" style="margin:10px 0 0; color:var(--text-faint);">Invoice will appear here once hours are confirmed after the event.</p>
