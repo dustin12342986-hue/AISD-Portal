@@ -80,7 +80,12 @@
   // trade here because this page holds no rates, no crew names, and no
   // invoice data — the worst case is a junk request you delete.
   // ==========================================================================
-  const ACCESS_PASSCODE = "AISD 2026";
+  const ACCESS_PASSCODE = "ADV Media 2026";
+
+  // Anyone with an email on this domain can get in using the passcode above.
+  // Temporary arrangement until district Google accounts are sorted out —
+  // both the domain AND the passcode are required.
+  const ALLOWED_EMAIL_DOMAIN = "@arlingtonisd.org";
 </script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -133,6 +138,15 @@
     border-radius:10px; padding:12px 14px; font-size:13.5px; margin-top:12px; }
   .ok-msg { background:#10241B; border:1px solid var(--green); color:#A8E0C4;
     border-radius:10px; padding:12px 14px; font-size:13.5px; margin-top:12px; }
+  .portal-tabs {
+    display:flex; background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; padding:4px; margin-bottom:18px;
+  }
+  .portal-tab {
+    flex:1; padding:11px 0; border-radius:9px; border:none; cursor:pointer;
+    background:transparent; color:var(--text-muted); font-weight:800; font-size:14px;
+  }
+  .portal-tab.on { background:var(--blue); color:#fff; }
   .footnote { color:var(--text-faint); font-size:12.5px; line-height:1.55; }
   .summary { background:var(--panel2); border-radius:10px; padding:14px; font-size:13.5px; line-height:1.7; }
 </style>
@@ -161,6 +175,30 @@ let auth = null;
 let currentUser = null;
 let gsiInitialized = false;
 let passcodeAccess = false;
+let passcodeEmail = null;
+
+// Firebase keeps the same anonymous account across visits, but only if we
+// don't sign them out. The passcode grant is stored here so a returning
+// visitor is recognised on reload and keeps their request history.
+const GRANT_KEY = "advPasscodeGrant";
+const GRANT_DAYS = 90;
+
+function saveGrant(email) {
+  try {
+    localStorage.setItem(GRANT_KEY, JSON.stringify({ email, at: Date.now() }));
+  } catch (e) { /* private mode — they'll just re-enter the code next time */ }
+}
+function loadGrant() {
+  try {
+    const g = JSON.parse(localStorage.getItem(GRANT_KEY) || "null");
+    if (!g || !g.email || !g.at) return null;
+    if (Date.now() - g.at > GRANT_DAYS * 864e5) return null;
+    return g;
+  } catch (e) { return null; }
+}
+function clearGrant() {
+  try { localStorage.removeItem(GRANT_KEY); } catch (e) { /* nothing to clear */ }
+}
 
 let form = {
   eventName: "", venue: "", eventDate: "", callTime: "", endTime: "",
@@ -198,7 +236,13 @@ function init() {
     if (!user) { passcodeAccess = false; renderSignIn(); return; }
     // Anonymous users only get here by entering the correct passcode.
     if (user.isAnonymous) {
-      if (!passcodeAccess) { auth.signOut(); return; }
+      if (!passcodeAccess) {
+        const grant = loadGrant();
+        if (!grant) { auth.signOut(); return; }
+        passcodeAccess = true;
+        passcodeEmail = grant.email;
+      }
+      if (!form.contactEmail && passcodeEmail) form.contactEmail = passcodeEmail;
       render();
       return;
     }
@@ -234,10 +278,11 @@ function renderSignIn() {
       <div id="signInError"></div>
     </div>
     <div class="card">
-      <div class="label">Or use the access code</div>
+      <div class="label">Or sign in with your district email</div>
       <p class="footnote" style="margin-bottom:12px;">
-        If Google sign-in doesn't work on your district account, use the code we gave you.
+        Enter your ${esc(ALLOWED_EMAIL_DOMAIN)} email address and the access code we provided.
       </p>
+      <input id="emailInput" type="email" placeholder="you${esc(ALLOWED_EMAIL_DOMAIN)}" style="margin-bottom:10px;" />
       <input id="passcodeInput" type="password" placeholder="Access code" />
       <div id="passcodeError"></div>
       <button class="btn" id="passcodeBtn" style="margin-top:12px;">Continue</button>
@@ -246,14 +291,30 @@ function renderSignIn() {
 
   const pcBtn = document.getElementById("passcodeBtn");
   const pcInput = document.getElementById("passcodeInput");
+  const emailInput = document.getElementById("emailInput");
   const tryPasscode = async () => {
+    const email = (emailInput.value || "").trim().toLowerCase();
     const entered = (pcInput.value || "").trim();
-    if (!entered) return;
-    if (entered !== ACCESS_PASSCODE) {
-      document.getElementById("passcodeError").innerHTML =
-        `<div class="error-msg">That code isn't right. Check it and try again.</div>`;
+    const errEl = document.getElementById("passcodeError");
+
+    if (!email) {
+      errEl.innerHTML = `<div class="error-msg">Enter your district email address.</div>`;
       return;
     }
+    if (!email.endsWith(ALLOWED_EMAIL_DOMAIN)) {
+      errEl.innerHTML = `<div class="error-msg">That email doesn't end in ${esc(ALLOWED_EMAIL_DOMAIN)}. Use your district address, or sign in with Google above.</div>`;
+      return;
+    }
+    if (!entered) {
+      errEl.innerHTML = `<div class="error-msg">Enter the access code.</div>`;
+      return;
+    }
+    if (entered !== ACCESS_PASSCODE) {
+      errEl.innerHTML = `<div class="error-msg">That code isn't right. Check it and try again.</div>`;
+      return;
+    }
+    passcodeEmail = email;
+    saveGrant(email);
     pcBtn.disabled = true;
     pcBtn.textContent = "Signing in…";
     try {
@@ -301,7 +362,114 @@ function renderNotAllowed() {
       <button class="btn btn-ghost" id="signOutBtn" style="margin-top:14px;">Sign out</button>
     </div>
   `;
-  document.getElementById("signOutBtn").onclick = () => auth.signOut();
+  document.getElementById("signOutBtn").onclick = () => { clearGrant(); auth.signOut(); };
+}
+
+// Client-facing status labels. Deliberately plainer than the internal
+// status values — "scheduled" means something specific to us, "Confirmed"
+// is what the client actually cares about.
+const STATUS_LABELS = {
+  new:       { text: "Received",  color: "var(--amber)", note: "We've got it — confirming crew availability." },
+  scheduled: { text: "Confirmed", color: "var(--green)", note: "Crew are booked for this event." },
+  completed: { text: "Completed", color: "var(--blue)",  note: "Event wrapped." },
+  declined:  { text: "Declined",  color: "var(--red)",   note: "We weren't able to staff this one." },
+};
+
+function renderMyRequests() {
+  const root = document.getElementById("root");
+  root.innerHTML = `
+    ${signedInBar()}
+    ${tabBar("mine")}
+    <div id="reqList"><div class="footnote">Loading…</div></div>
+  `;
+  wireTabs();
+  wireSignOut();
+
+  db.ref(`laborRequests/${currentUser.uid}`).once("value").then((snap) => {
+    const all = snap.val() || {};
+    const entries = Object.entries(all)
+      .map(([key, r]) => ({ key, ...r }))
+      .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+    const listEl = document.getElementById("reqList");
+    if (!listEl) return;
+
+    if (entries.length === 0) {
+      listEl.innerHTML = `<div class="card"><p class="footnote" style="margin:0;">No requests yet. Use the New Request tab to submit one.</p></div>`;
+      return;
+    }
+
+    listEl.innerHTML = entries.map((r) => {
+      const st = STATUS_LABELS[r.status] || STATUS_LABELS.new;
+      const inv = r.clientInvoice;
+      return `
+        <div class="card">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+            <span style="font-size:17px; font-weight:800; flex:1;">${esc(r.eventName || "Untitled event")}</span>
+            <span style="background:${st.color}; color:#08120C; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:6px; text-transform:uppercase; letter-spacing:0.4px;">${st.text}</span>
+          </div>
+          <div class="footnote" style="margin-bottom:10px;">
+            ${esc(r.eventDate || "")}${r.callTime ? " · call " + esc(r.callTime) : ""}${r.venue ? "<br />" + esc(r.venue) : ""}
+          </div>
+          <div class="summary" style="margin-bottom:10px;">
+            ${(r.positions || []).map((p) => `${p.qty} × ${esc(p.name)}`).join("<br />")}
+          </div>
+          <p class="footnote" style="margin:0;">${st.note}</p>
+
+          ${inv ? `
+            <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+              <div class="label" style="margin-bottom:8px;">Invoice</div>
+              ${(inv.lines || []).map((l) => `
+                <div style="display:flex; gap:10px; font-size:13px; padding:5px 0;">
+                  <span style="flex:1; color:var(--text-muted);">${esc(l.rateClass)} — ${l.billedHours}h @ $${l.rate}/hr${l.detail ? ` <span style="color:var(--text-faint);">(${esc(l.detail)})</span>` : ""}</span>
+                  <span style="font-weight:700;">$${Number(l.amount).toFixed(2)}</span>
+                </div>
+              `).join("")}
+              <div style="display:flex; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+                <span style="flex:1; font-size:15px; font-weight:800;">Total due</span>
+                <span style="font-size:17px; font-weight:800; color:var(--green);">$${Number(inv.total).toFixed(2)}</span>
+              </div>
+              <p class="footnote" style="margin:8px 0 0;">Terms: ${esc(inv.terms || "Net 30")}${inv.issuedAt ? " · issued " + new Date(inv.issuedAt).toLocaleDateString() : ""}</p>
+            </div>
+          ` : r.status === "scheduled" || r.status === "completed" ? `
+            <p class="footnote" style="margin:10px 0 0; color:var(--text-faint);">Invoice will appear here once hours are confirmed after the event.</p>
+          ` : ""}
+        </div>
+      `;
+    }).join("");
+  }).catch((e) => {
+    const listEl = document.getElementById("reqList");
+    if (listEl) listEl.innerHTML = `<div class="error-msg">Couldn't load your requests (${esc(e.message || "unknown error")}).</div>`;
+  });
+}
+
+function signedInBar() {
+  return `
+    <div class="footnote" style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <span style="flex:1;">${currentUser && currentUser.isAnonymous
+        ? "Signed in as " + esc(passcodeEmail || "access code")
+        : "Signed in as " + esc(currentUser && currentUser.email)}</span>
+      <button id="signOutLink" style="background:none; border:none; color:var(--blue); font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;">Sign out</button>
+    </div>
+  `;
+}
+
+function tabBar(active) {
+  const tab = (id, label) => `
+    <button class="portal-tab ${active === id ? "on" : ""}" data-tab="${id}">${label}</button>
+  `;
+  return `<div class="portal-tabs">${tab("new", "New Request")}${tab("mine", "My Requests")}</div>`;
+}
+
+function wireTabs() {
+  document.querySelectorAll(".portal-tab").forEach((b) => {
+    b.onclick = () => { b.dataset.tab === "mine" ? renderMyRequests() : render(); };
+  });
+}
+
+function wireSignOut() {
+  const el = document.getElementById("signOutLink");
+  if (el) el.onclick = () => { clearGrant(); auth.signOut(); };
 }
 
 function totalRequested() {
@@ -333,12 +501,8 @@ function render() {
   }
 
   root.innerHTML = `
-    <div class="footnote" style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-      <span style="flex:1;">${currentUser && currentUser.isAnonymous
-        ? "Signed in with access code"
-        : "Signed in as " + esc(currentUser && currentUser.email)}</span>
-      <button id="signOutLink" style="background:none; border:none; color:var(--blue); font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline;">Sign out</button>
-    </div>
+    ${signedInBar()}
+    ${tabBar("new")}
     <div class="card">
       <div class="field">
         <div class="label">Event name</div>
@@ -434,8 +598,8 @@ function render() {
     b.onclick = () => { const id = b.dataset.dec; if (form.qty[id] > 0) form.qty[id]--; render(); };
   });
   document.getElementById("submitBtn").onclick = submitRequest;
-  const signOutLink = document.getElementById("signOutLink");
-  if (signOutLink) signOutLink.onclick = () => auth.signOut();
+  wireTabs();
+  wireSignOut();
 
   if (form.error) {
     document.getElementById("formError").innerHTML = `<div class="error-msg">${esc(form.error)}</div>`;
@@ -460,7 +624,7 @@ async function submitRequest() {
       .filter((p) => form.qty[p.id] > 0)
       .map((p) => ({ id: p.id, name: p.name, qty: form.qty[p.id] }));
 
-    await db.ref("laborRequests").push({
+    await db.ref(`laborRequests/${currentUser.uid}`).push({
       client: "AISD",
       eventName: form.eventName.trim(),
       venue: form.venue.trim(),
@@ -475,7 +639,7 @@ async function submitRequest() {
       notes: form.notes.trim(),
       // Who was actually signed in when this was submitted — separate from
       // the contact fields, which they can edit.
-      submittedByEmail: currentUser && !currentUser.isAnonymous ? currentUser.email : null,
+      submittedByEmail: currentUser && !currentUser.isAnonymous ? currentUser.email : (passcodeEmail || null),
       submittedByUid: currentUser ? currentUser.uid : null,
       submittedVia: currentUser && currentUser.isAnonymous ? "access code" : "google",
       status: "new",

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADV Media — Labor Request Guide</title>
+<meta name="theme-color" content="#4A8FC0" />
+<style>
+  :root {
+    --bg:#0A0D12; --panel:#12181F; --panel2:#1A222B; --border:#26313D;
+    --text:#EDEFF3; --text-muted:#8A96A3; --text-faint:#5C6774;
+    --green:#33A870; --amber:#E0A63C; --red:#D65A4E; --blue:#4A8FC0;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.6;
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:0 18px 80px; }
+
+  .banner { text-align:center; padding:36px 0 26px; border-bottom:1px solid var(--border); margin-bottom:26px; }
+  .banner h1 { font-family:Georgia,serif; font-size:29px; margin:0; letter-spacing:-0.4px; }
+  .banner p { color:var(--text-muted); font-size:13.5px; margin:8px 0 0; }
+
+  .toc { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:30px; }
+  .toc-title { font-size:11.5px; font-weight:800; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; }
+  .toc a { display:block; color:var(--blue); text-decoration:none; font-size:14px; padding:5px 0; font-weight:600; }
+
+  h2 { font-size:20px; margin:36px 0 4px; scroll-margin-top:16px; padding-top:22px; border-top:1px solid var(--border); }
+  h2:first-of-type { border-top:none; padding-top:0; }
+  h3 { font-size:15.5px; margin:22px 0 6px; }
+  p { font-size:14.5px; color:var(--text-muted); margin:8px 0; }
+  ol, ul { font-size:14.5px; color:var(--text-muted); padding-left:22px; margin:10px 0; }
+  li { margin:7px 0; }
+  strong { color:var(--text); }
+
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); }
+  th { color:var(--text-faint); font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; font-weight:800; }
+  td { color:var(--text-muted); }
+  td strong { color:var(--text); }
+
+  .callout { border-radius:12px; padding:14px 16px; margin:16px 0; font-size:14px; background:var(--panel); border:1px solid var(--border); }
+  .callout.important { background:#1F1810; border-color:var(--amber); color:#FFD699; }
+  .callout.good { background:#10201A; border-color:var(--green); color:#A8E0C4; }
+  .callout strong { color:inherit; }
+
+  .btn-link { display:inline-block; background:var(--blue); color:#fff; text-decoration:none; padding:11px 20px; border-radius:10px; font-weight:800; font-size:14px; margin:10px 0; }
+  .status-row { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .status-row:last-child { border-bottom:none; }
+  .chip { font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:6px; text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; }
+  .footer { margin-top:44px; padding-top:22px; border-top:1px solid var(--border); text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">
+    <h1>Requesting Labor</h1>
+    <p>A short guide to the ADV Media crew request portal.</p>
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <a href="#access">1. Getting Access</a>
+    <a href="#submit">2. Submitting a Request</a>
+    <a href="#positions">3. Which Positions to Request</a>
+    <a href="#status">4. Tracking Your Request</a>
+    <a href="#invoice">5. Invoices &amp; Payment</a>
+    <a href="#billing">6. How Hours Are Billed</a>
+    <a href="#changes">7. Changes &amp; Cancellations</a>
+    <a href="#contact">8. Contact</a>
+  </div>
+
+  <h2 id="access">1. Getting Access</h2>
+  <p>The portal is a web page — nothing to install, works on a phone or computer.</p>
+  <a class="btn-link" href="https://dustin12342986-hue.github.io/AISD-Portal/aisd-request.html">Open the Request Portal</a>
+  <p>There are two ways to sign in:</p>
+  <ul>
+    <li><strong>Google sign-in</strong> — use your district account. This is the better option: it remembers you, so you can see all your past requests and invoices in one place.</li>
+    <li><strong>District email + access code</strong> — enter any @arlingtonisd.org email address along with the access code we provided. Anyone on your team can use this.</li>
+  </ul>
+  <div class="callout">
+    <strong>Either way, the portal remembers you</strong> on the device you signed in from, so your past requests and invoices stay available. If you sign out, or switch to a different phone or computer, you'll just enter the code again.
+  </div>
+  <p>If you'd like someone else on your team to have access, let us know their email and we'll add them.</p>
+
+  <h2 id="submit">2. Submitting a Request</h2>
+  <p>Open the portal, stay on the <strong>New Request</strong> tab, and fill in:</p>
+  <ol>
+    <li><strong>Event name</strong> — whatever you call it internally is fine.</li>
+    <li><strong>Venue</strong> — which facility, and the room or space if it matters.</li>
+    <li><strong>Date</strong></li>
+    <li><strong>Crew call time</strong> — when you need crew <em>on site and working</em>, not when doors open.</li>
+    <li><strong>Estimated end</strong> — your best guess. This sets how long crew are booked, so see section 6 before you round up.</li>
+    <li><strong>Positions</strong> — tap + or − for each role.</li>
+    <li><strong>Your contact info</strong></li>
+    <li><strong>Notes</strong> — load-in details, special gear, anything unusual.</li>
+  </ol>
+  <div class="callout important">
+    <strong>Submitting isn't a confirmation.</strong> It comes to us as a request. We'll check availability and confirm — you'll see the status change in the portal.
+  </div>
+
+  <h3>How much notice we need</h3>
+  <p>The earlier the better, honestly. Two weeks or more and we can almost always staff it fully. Inside a week gets harder, especially for specialized positions. Same-week requests we'll do our best with, but we may not fill every role.</p>
+  <p>If something is urgent, submit it anyway and then call — don't wait on the portal.</p>
+
+  <h2 id="positions">3. Which Positions to Request</h2>
+  <p>If you're not sure what you need, give your best guess and describe the event in the notes. We'll follow up and adjust — it's easier for us to right-size it than for you to guess exactly.</p>
+  <table>
+    <tr><th>Position</th><th>What they do</th></tr>
+    <tr><td><strong>Stagehand</strong></td><td>Carpentry, stage plots, moving scenery and gear during the show</td></tr>
+    <tr><td><strong>Spotlight Operator</strong></td><td>Follow spot</td></tr>
+    <tr><td><strong>General AV / Assist</strong></td><td>Audio, lighting, or video assist — second on a department</td></tr>
+    <tr><td><strong>Coordinator</strong></td><td>On-site crew coordination for larger calls</td></tr>
+    <tr><td><strong>Lead Technician</strong></td><td>Runs a department — audio, lighting, video, or stage management</td></tr>
+    <tr><td><strong>Graphics Operator</strong></td><td>Graphics, PowerPoint, or teleprompter</td></tr>
+    <tr><td><strong>Producer / Director</strong></td><td>Show producer, director, or engineer-in-charge</td></tr>
+  </table>
+  <div class="callout">
+    <strong>Rule of thumb:</strong> every department you're running (audio, lighting, video) needs a Lead. Assists scale with how big the show is. Stagehands scale with how much moves.
+  </div>
+
+  <h2 id="status">4. Tracking Your Request</h2>
+  <p>Open the <strong>My Requests</strong> tab any time to see where things stand.</p>
+  <div style="background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:6px 16px; margin:16px 0;">
+    <div class="status-row">
+      <span class="chip" style="background:var(--amber); color:#241905;">Received</span>
+      <span style="font-size:14px; color:var(--text-muted);">We have it and are confirming crew availability.</span>
+    </div>
+    <div class="status-row">
+      <span class="chip" style="background:var(--green); color:#08120C;">Confirmed</span>
+      <span style="font-size:14px; color:var(--text-muted);">Crew are booked. You're on the schedule.</span>
+    </div>
+    <div class="status-row">
+      <span class="chip" style="background:var(--blue); color:#fff;">Completed</span>
+      <span style="font-size:14px; color:var(--text-muted);">Event wrapped. Invoice follows once hours are confirmed.</span>
+    </div>
+    <div class="status-row">
+      <span class="chip" style="background:var(--red); color:#fff;">Declined</span>
+      <span style="font-size:14px; color:var(--text-muted);">We weren't able to staff it. We'll always reach out directly if this happens.</span>
+    </div>
+  </div>
+  <p>You'll also hear from us directly — the portal is there so you can check without having to ask.</p>
+
+  <h2 id="invoice">5. Invoices &amp; Payment</h2>
+  <p>After the event, we review the crew's actual clock-in and clock-out times. Once hours are confirmed, the invoice appears under that event in <strong>My Requests</strong>.</p>
+  <p>Each invoice shows:</p>
+  <ul>
+    <li>Each position billed, by rate class</li>
+    <li>Hours billed, broken into straight time, overtime, and double time</li>
+    <li>The hourly rate applied</li>
+    <li>Line totals and the amount due</li>
+  </ul>
+  <p><strong>Terms are Net 30</strong> from the invoice date.</p>
+  <div class="callout good">
+    <strong>Invoices are based on actual worked hours</strong>, not estimates — with the minimums and rules in the next section applied.
+  </div>
+
+  <h2 id="billing">6. How Hours Are Billed</h2>
+  <p>Worth understanding before you book, because a few of these affect what you're charged more than people expect.</p>
+
+  <h3>Minimum calls</h3>
+  <p>Every position carries a minimum. If an event finishes early, the minimum still applies — crew turned down other work to hold the date.</p>
+  <table>
+    <tr><th>Position</th><th>Minimum</th></tr>
+    <tr><td>Stagehand</td><td>5 hours</td></tr>
+    <tr><td>General AV / Assist</td><td>5 hours</td></tr>
+    <tr><td>Spotlight Operator</td><td>10 hours</td></tr>
+    <tr><td>Coordinator</td><td>10 hours</td></tr>
+    <tr><td>Lead Technician</td><td>10 hours</td></tr>
+    <tr><td>Graphics Operator</td><td>10 hours</td></tr>
+    <tr><td>Producer / Director</td><td>10 hours</td></tr>
+  </table>
+
+  <h3>Overtime</h3>
+  <ul>
+    <li><strong>Time and a half</strong> after 8 hours for stagehands and assists; after 10 hours for all other positions.</li>
+    <li><strong>Double time</strong> after 12 hours, all positions.</li>
+    <li><strong>Night differential:</strong> hours between midnight and 6:00 AM bill at time and a half.</li>
+  </ul>
+  <div class="callout important">
+    <strong>Scheduled overtime is billed even if the event ends early.</strong> When you book a call that runs into overtime, we commit those hours to the crew and can't take them back. Please give us your realistic end time rather than padding it.
+  </div>
+
+  <h3>Meals</h3>
+  <p>Meal breaks are scheduled every 5 hours and are paid.</p>
+  <div class="callout important">
+    <strong>If a meal isn't provided within 5 hours, hours bill at time and a half until crew are released for one.</strong> This is the single easiest thing to avoid, and the most common reason an invoice comes in higher than expected. Plan a meal break into any call longer than five hours.
+  </div>
+  <p>Once a meal is taken, a minimum amount of paid time after it is guaranteed — 3 hours for stagehands, 5 hours for assists.</p>
+
+  <h2 id="changes">7. Changes &amp; Cancellations</h2>
+  <p>Plans change — just tell us as early as you can.</p>
+  <ul>
+    <li><strong>Adding positions:</strong> submit a new request for the same event, and note in the comments that it's an addition.</li>
+    <li><strong>Reducing or changing times:</strong> contact us directly. Don't submit a second request — it'll read as a separate call.</li>
+    <li><strong>Cancelling:</strong> reach out as soon as you know. Once crew are booked and the date is close, minimums may still apply, and we'd rather talk it through than surprise you on an invoice.</li>
+  </ul>
+
+  <h2 id="contact">8. Contact</h2>
+  <p>For anything urgent, or anything the portal doesn't cover:</p>
+  <p><strong>Dustin Brown</strong> — ADV Media Limited Company<br />
+  <a href="mailto:invoices.advmedia@gmail.com" style="color:var(--blue);">invoices.advmedia@gmail.com</a></p>
+  <p>We'd rather hear from you early than have you work around something. If the portal is being difficult, just call.</p>
+
+  <div class="footer">
+    <a class="btn-link" href="https://dustin12342986-hue.github.io/AISD-Portal/aisd-request.html">Open the Request Portal</a>
+    <p style="font-size:12.5px; color:var(--text-faint); margin-top:14px;">ADV Media Limited Company · We look forward to working with you this season.</p>
+  </div>
+</div>
+</body>
+</html>
