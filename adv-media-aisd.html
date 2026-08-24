@@ -1433,7 +1433,7 @@ async function renderShiftLog() {
 }
 // Shift Marketplace (pick up / drop shifts)
 // ============================================================================
-const TRADEABLE_ROLES = ["Stagehand", "Spotlight Operator", "GAV", "A2", "L2", "V2", "Show A2", "Show L2", "Show V2", "Coordinator", "A1", "L1", "V1", "Engineer", "Stage Manager", "GFX", "Producer", "Director", "EIC"];
+const TRADEABLE_ROLES = ["Stagehand", "Spotlight Operator", "GAV", "A2", "L2", "V2", "Show Assist", "Coordinator", "A1", "L1", "V1", "Engineer", "Stage Manager", "GFX", "Producer", "Director", "EIC"];
 const DROP_REASONS = ["Family Emergency", "Medical Emergency", "Double Booking", "Other"];
 
 let unsubLiveRoster = null;
@@ -1937,7 +1937,7 @@ const RATE_CLASSES = {
   showAssist: {
     label: "Show Assist",
     rate: 55, minHours: 10, otAfter: 10, dtAfter: 12, postMealMin: null,
-    roles: ["Show A2", "Show L2", "Show V2"],
+    roles: ["Show Assist", "Show A2", "Show L2", "Show V2"],
   },
   coordinator: {
     label: "Coordinator",
@@ -2459,9 +2459,7 @@ const REQUEST_POSITION_ROLES = {
   stagehand:   "Stagehand",
   spotlight:   "Spotlight Operator",
   gav:         "GAV",
-  showa2:      "Show A2",
-  showl2:      "Show L2",
-  showv2:      "Show V2",
+  showassist:  "Show Assist",
   coordinator: "Coordinator",
   lead:        "A1",
   graphics:    "GFX",

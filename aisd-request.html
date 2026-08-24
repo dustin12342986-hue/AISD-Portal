@@ -163,10 +163,8 @@
 const POSITIONS = [
   { id:"stagehand",  name:"Stagehand",           desc:"Carpentry, stage plots, moving scenery and gear during the show" },
   { id:"spotlight",  name:"Spotlight Operator",  desc:"Follow spot" },
-  { id:"gav",        name:"Assist (A2 / L2 / V2)", desc:"Setup and teardown only — they do not operate equipment during the show" },
-  { id:"showa2",     name:"Show A2",             desc:"Micing talent and handing off mics during the show" },
-  { id:"showl2",     name:"Show L2",             desc:"Moving and adjusting lights on set during the show" },
-  { id:"showv2",     name:"Show V2",             desc:"Moving video set pieces and LED panels during the show" },
+  { id:"gav",        name:"Assist (A2 / L2 / V2)", desc:"Setup and teardown only — does not operate equipment during show" },
+  { id:"showassist", name:"Show Assist",         desc:"Works during the show — micing talent, moving lights on set, or shifting video panels. Tell us which in the notes." },
   { id:"coordinator",name:"Coordinator",         desc:"On-site crew coordination" },
   { id:"lead",       name:"Lead Technician",     desc:"A1, L1, V1, Engineer, Stage Manager" },
   { id:"graphics",   name:"Graphics Operator",   desc:"GFX, PowerPoint, or teleprompter" },
@@ -296,12 +294,30 @@ function renderSignIn() {
       try {
         await auth.signInWithEmailAndPassword(email, ACCESS_PASSCODE);
       } catch (signInErr) {
-        if (signInErr.code === "auth/user-not-found") {
-          await auth.createUserWithEmailAndPassword(email, ACCESS_PASSCODE);
+        // Newer Firebase returns a single generic code instead of saying
+        // whether the account exists — so a failed sign-in could mean
+        // either. Try creating it; if the address is already taken, then
+        // it really was the wrong code.
+        const ambiguous = [
+          "auth/user-not-found",
+          "auth/invalid-login-credentials",
+          "auth/invalid-credential",
+        ].includes(signInErr.code);
+
+        if (ambiguous) {
+          try {
+            await auth.createUserWithEmailAndPassword(email, ACCESS_PASSCODE);
+          } catch (createErr) {
+            if (createErr.code === "auth/email-already-in-use") {
+              throw new Error("This email is already registered with a different access code. Let us know and we will reset it.");
+            }
+            if (createErr.code === "auth/weak-password") {
+              throw new Error("The access code is too short for Firebase (needs 6+ characters). Contact ADV Media.");
+            }
+            throw createErr;
+          }
         } else if (signInErr.code === "auth/wrong-password") {
-          // The address exists under a different password — most likely the
-          // access code was rotated after this account was made.
-          throw new Error("This email is already registered with a different code. Contact ADV Media and we'll reset it.");
+          throw new Error("This email is already registered with a different access code. Let us know and we will reset it.");
         } else {
           throw signInErr;
         }
@@ -312,7 +328,7 @@ function renderSignIn() {
       pcBtn.disabled = false;
       pcBtn.textContent = "Continue";
       document.getElementById("passcodeError").innerHTML =
-        `<div class="error-msg">Couldn't sign in (${esc(e.message || "unknown error")}). Anonymous sign-in may not be turned on for this project.</div>`;
+        `<div class="error-msg">${esc(e.message || "Couldn't sign in. Check the email and code, then try again.")}</div>`;
     }
   };
   pcBtn.onclick = tryPasscode;
